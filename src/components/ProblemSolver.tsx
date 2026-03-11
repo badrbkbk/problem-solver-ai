@@ -1,55 +1,37 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, Search, Loader2, Globe, Youtube, FileText, Sparkles, RotateCcw, AlertCircle } from 'lucide-react';
-import { findSolutions, type Solution } from '../lib/database';
+import { Brain, Search, Loader2, Globe, Youtube, FileText, Sparkles, RotateCcw, AlertCircle, Languages } from 'lucide-react';
+import { findSolutions, openTranslation, type Solution } from '../lib/database';
 
 const EXAMPLES = [
   'كيفاش نتعلم البرمجة من الصفر؟',
-  'عندي مشكل في النوم بالليل',
+  'عندي مشكل في النوم',
   'بغيت نبدا مشروع صغير',
-  'كيفاش نحسن مستواي في الإنجليزية؟',
-  'عندي ألم في الظهر من الجلوس',
-  'مضغوط ومتوتر كثيراً',
-  'باحث على شغل وما لقيتش',
+  'كيفاش نحسن الإنجليزية؟',
+  'مضغوط ومتوتر',
+  'باحث على شغل',
   'الإنترنت ديالي بطيء',
+  'I have anxiety problems',
+  'I want to learn coding',
 ];
 
 const TYPE_CONFIG = {
-  website: {
-    icon: Globe,
-    label: 'موقع إلكتروني',
-    color: 'from-blue-500 to-cyan-500',
-    bg: 'bg-blue-500/10 border-blue-500/20',
-    badge: 'bg-blue-500/20 text-blue-300',
-  },
-  youtube: {
-    icon: Youtube,
-    label: 'فيديو يوتيوب',
-    color: 'from-red-500 to-pink-500',
-    bg: 'bg-red-500/10 border-red-500/20',
-    badge: 'bg-red-500/20 text-red-300',
-  },
-  article: {
-    icon: FileText,
-    label: 'مقال',
-    color: 'from-green-500 to-emerald-500',
-    bg: 'bg-green-500/10 border-green-500/20',
-    badge: 'bg-green-500/20 text-green-300',
-  },
+  website: { icon: Globe, label: 'موقع إلكتروني', color: 'from-blue-500 to-cyan-500', bg: 'bg-blue-500/10 border-blue-500/20', badge: 'bg-blue-500/20 text-blue-300' },
+  youtube: { icon: Youtube, label: 'فيديو يوتيوب', color: 'from-red-500 to-pink-500', bg: 'bg-red-500/10 border-red-500/20', badge: 'bg-red-500/20 text-red-300' },
+  article: { icon: FileText, label: 'مقال', color: 'from-green-500 to-emerald-500', bg: 'bg-green-500/10 border-green-500/20', badge: 'bg-green-500/20 text-green-300' },
 };
 
 function SolutionCard({ solution, index }: { solution: Solution; index: number }) {
   const config = TYPE_CONFIG[solution.type];
   const Icon = config.icon;
+  const isEnglish = solution.lang === 'en';
+
   return (
-    <motion.a
-      href={solution.url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.08 }}
-      className={`glass rounded-2xl p-5 block border card-hover ${config.bg}`}
+      className={`glass rounded-2xl p-5 border card-hover ${config.bg}`}
     >
       <div className="flex items-start gap-4">
         <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${config.color} flex items-center justify-center flex-shrink-0 shadow-lg`}>
@@ -59,18 +41,41 @@ function SolutionCard({ solution, index }: { solution: Solution; index: number }
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${config.badge}`}>{config.label}</span>
             <span className="text-xs text-white/40">{solution.source}</span>
+            {isEnglish && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 font-medium">EN</span>
+            )}
           </div>
           <h3 className="text-white font-bold text-base mb-1">{solution.title}</h3>
-          <p className="text-white/60 text-sm leading-relaxed">{solution.description}</p>
+          <p className="text-white/60 text-sm leading-relaxed mb-3">{solution.description}</p>
+          <div className="flex gap-2 flex-wrap">
+            <a
+              href={solution.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 text-white/80 hover:bg-white/20 transition-all flex items-center gap-1"
+            >
+              <Globe className="w-3 h-3" />
+              افتح الرابط
+            </a>
+            {isEnglish && (
+              <button
+                onClick={() => openTranslation(`${solution.title}: ${solution.description}`)}
+                className="text-xs px-3 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 transition-all flex items-center gap-1"
+              >
+                <Languages className="w-3 h-3" />
+                ترجمة إلى العربية
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </motion.a>
+    </motion.div>
   );
 }
 
 export default function ProblemSolver() {
   const [problem, setProblem] = useState('');
-  const [result, setResult] = useState<{ summary: string; solutions: Solution[] } | null>(null);
+  const [result, setResult] = useState<{ summary: string; solutions: Solution[]; matchedIn: 'arabic' | 'english' } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -79,29 +84,19 @@ export default function ProblemSolver() {
     setIsLoading(true);
     setNotFound(false);
     setResult(null);
-
-    // محاكاة تأخير بسيط لتجربة مستخدم أفضل
     setTimeout(() => {
       const found = findSolutions(problem);
-      if (found) {
-        setResult(found);
-      } else {
-        setNotFound(true);
-      }
+      if (found) setResult(found);
+      else setNotFound(true);
       setIsLoading(false);
-    }, 800);
+    }, 700);
   };
 
-  const handleReset = () => {
-    setResult(null);
-    setNotFound(false);
-    setProblem('');
-  };
+  const handleReset = () => { setResult(null); setNotFound(false); setProblem(''); };
 
   return (
     <div className="min-h-screen px-4 py-12">
       <div className="max-w-2xl mx-auto">
-
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-10">
           <div className="w-20 h-20 mx-auto mb-4 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-2xl">
@@ -120,7 +115,7 @@ export default function ProblemSolver() {
                   value={problem}
                   onChange={(e) => setProblem(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && e.ctrlKey && handleSolve()}
-                  placeholder="مثلاً: كيفاش نتعلم البرمجة من الصفر؟"
+                  placeholder="مثلاً: كيفاش نتعلم البرمجة؟ / I have anxiety problems"
                   className="w-full bg-transparent p-4 text-white placeholder:text-white/30 resize-none outline-none text-base min-h-[130px] leading-relaxed"
                   dir="auto"
                 />
@@ -136,9 +131,7 @@ export default function ProblemSolver() {
               <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                 onClick={handleSolve} disabled={isLoading || !problem.trim()}
                 className="w-full py-4 rounded-2xl btn-primary text-white font-black text-xl flex items-center justify-center gap-3 disabled:opacity-40 shadow-xl">
-                {isLoading
-                  ? <><Loader2 className="w-6 h-6 animate-spin" /> جاري البحث...</>
-                  : <><Search className="w-6 h-6" /> ابحث عن حل 🔍</>}
+                {isLoading ? <><Loader2 className="w-6 h-6 animate-spin" /> جاري البحث...</> : <><Search className="w-6 h-6" /> ابحث عن حل 🔍</>}
               </motion.button>
               <p className="text-center text-white/30 text-xs">Ctrl + Enter للإرسال السريع</p>
             </motion.div>
@@ -150,8 +143,8 @@ export default function ProblemSolver() {
               <div className="glass rounded-3xl p-10 border border-orange-500/20">
                 <AlertCircle className="w-16 h-16 text-orange-400 mx-auto mb-4" />
                 <h2 className="text-2xl font-black text-white mb-2">لم نجد حلاً محدداً</h2>
-                <p className="text-white/60 mb-2">المشكلة التي كتبتها غير موجودة في قاعدة بياناتنا حالياً.</p>
-                <p className="text-white/40 text-sm">جرب أن تعيد صياغة مشكلتك بكلمات مختلفة</p>
+                <p className="text-white/60 mb-2">جرب إعادة صياغة مشكلتك بكلمات مختلفة</p>
+                <p className="text-white/40 text-sm">مثلاً: بدل “مشكلة” جرب “كيفاش” أو اكتب بالإنجليزية</p>
               </div>
               <button onClick={handleReset}
                 className="w-full py-3 rounded-2xl glass text-white/70 hover:text-white font-bold flex items-center justify-center gap-2 transition-all">
@@ -163,18 +156,34 @@ export default function ProblemSolver() {
           {/* Results */}
           {result && (
             <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+              {/* Summary */}
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                 className="glass rounded-2xl p-5 border border-indigo-500/20">
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="w-5 h-5 text-indigo-400" />
                   <h2 className="text-indigo-300 font-bold">ملخص الحل</h2>
+                  {result.matchedIn === 'english' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 mr-auto">تم البحث بالإنجليزية ✨</span>
+                  )}
                 </div>
                 <p className="text-white/80 leading-relaxed">{result.summary}</p>
               </motion.div>
+
+              {/* English notice */}
+              {result.solutions.some(s => s.lang === 'en') && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+                  className="glass rounded-xl p-3 border border-yellow-500/20 flex items-center gap-2">
+                  <Languages className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                  <p className="text-yellow-300/80 text-xs">بعض المحتوى بالإنجليزية — اضغط على <strong>“ترجمة إلى العربية”</strong> لفتح المحتوى مترجماً في Google Translate</p>
+                </motion.div>
+              )}
+
+              {/* Cards */}
               <div className="space-y-3">
                 {result.solutions.map((s, i) => <SolutionCard key={i} solution={s} index={i} />)}
               </div>
-              <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
+
+              <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                 onClick={handleReset}
                 className="w-full py-3 rounded-2xl glass text-white/70 hover:text-white font-bold flex items-center justify-center gap-2 transition-all">
